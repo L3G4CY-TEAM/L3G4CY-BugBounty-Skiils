@@ -2,6 +2,9 @@
 # 보안 원칙: pull_request 트리거만 사용 (pull_request_target 절대 금지)
 # 이유: pull_request_target은 Fork PR에서 저장소 Secrets가 노출될 위험이 있음
 # PR에서 제출된 스크립트(scripts/)는 CI에서 절대 실행하지 않음
+#
+# write 권한이 필요한 작업(라벨, 코멘트, 리뷰어 지정)은
+# post-validation.yml (workflow_run)에서 처리
 
 name: Skill 검증
 
@@ -9,10 +12,9 @@ on:
   pull_request:
     types: [opened, synchronize]
 
-# 최소 권한 원칙 적용
+# Fork PR에서는 read만 허용됨 (GitHub 보안 정책)
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   validate:
@@ -133,54 +135,6 @@ jobs:
             echo "$COMMON_CHANGED"
           else
             echo "common_changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      # ──────────────────────────────────────────
-      # 3.5단계: PR 자동 라벨링
-      # 변경 파일 경로 기반으로 라벨 자동 부여
-      # Fork PR에서는 기여자가 라벨 권한이 없으므로 CI가 대신 부여
-      # ──────────────────────────────────────────
-      - name: PR 자동 라벨링
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          SKILL_DIRS="${{ steps.changed-files.outputs.skill_dirs }}"
-          COMMON_CHANGED="${{ steps.changed-files.outputs.common_changed }}"
-          LABELS=""
-
-          # skills/ 변경 시: 새 Skill vs Skill 수정 판별
-          if [ -n "$SKILL_DIRS" ]; then
-            HAS_NEW=0
-            HAS_MODIFIED=0
-
-            for SKILL_DIR in $SKILL_DIRS; do
-              # base 브랜치(origin/main)에 해당 디렉토리가 존재하면 수정, 없으면 신규
-              if git ls-tree -d origin/main -- "$SKILL_DIR" > /dev/null 2>&1 && \
-                 [ -n "$(git ls-tree -d origin/main -- "$SKILL_DIR")" ]; then
-                HAS_MODIFIED=1
-              else
-                HAS_NEW=1
-              fi
-            done
-
-            [ "$HAS_NEW" = "1" ] && LABELS="$LABELS,🆕 새 Skill"
-            [ "$HAS_MODIFIED" = "1" ] && LABELS="$LABELS,✏️ Skill 수정"
-          fi
-
-          # 공통 영역 변경 시
-          if [ "$COMMON_CHANGED" = "true" ]; then
-            LABELS="$LABELS,⚙️ 공통 영역"
-          fi
-
-          # 선행 쉼표 제거
-          LABELS=$(echo "$LABELS" | sed 's/^,//')
-
-          if [ -n "$LABELS" ]; then
-            echo "부여할 라벨: $LABELS"
-            gh pr edit ${{ github.event.number }} --add-label "$LABELS" 2>/dev/null \
-              || echo "::warning::라벨 자동 부여 실패 (권한 확인 필요)"
-          else
-            echo "자동 부여할 라벨 없음"
           fi
 
       # ──────────────────────────────────────────
@@ -426,12 +380,10 @@ jobs:
 
       # ──────────────────────────────────────────
       # 6단계: 공통 영역 보호
-      # .github/, templates/, README.md, CONTRIBUTING.md, CODEOWNERS 수정 감지
+      # skills/ 밖의 파일 수정 감지
       # ──────────────────────────────────────────
       - name: 공통 영역 보호 확인
         id: common-area-check
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           COMMON_CHANGED="${{ steps.changed-files.outputs.common_changed }}"
 
@@ -443,40 +395,46 @@ jobs:
           echo "::warning::공통 영역 파일이 수정되었습니다."
           echo "::warning::관리자 팀(@L3G4CY-TEAM/admins)의 리뷰 승인이 필요합니다."
 
-          # 관리자 팀을 PR 리뷰어로 자동 지정
-          echo "관리자 팀을 리뷰어로 지정 중..."
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/${{ github.repository }}/pulls/${{ github.event.number }}/requested_reviewers" \
-            -f "team_reviewers[]=admins" \
-            2>/dev/null \
-            && echo "리뷰어 지정 완료: @L3G4CY-TEAM/admins" \
-            || echo "::warning::리뷰어 자동 지정 실패 (팀 권한 확인 필요). 수동으로 @L3G4CY-TEAM/admins 를 리뷰어로 지정해 주세요."
+          # 리뷰어 자동 지정은 post-validation.yml (workflow_run)에서 처리
 
           # 공통 영역 수정 PR은 관리자 리뷰 전까지 체크 실패 처리
-          echo "::error::공통 영역 보호: .github/, templates/, README.md, CONTRIBUTING.md, CODEOWNERS, .gitignore, .gitattributes 는 관리자 팀의 리뷰가 필요합니다."
+          echo "::error::공통 영역 보호: skills/ 밖의 파일은 관리자 팀의 리뷰가 필요합니다."
           echo "::error::@L3G4CY-TEAM/admins 의 승인 후 머지가 가능합니다."
           exit 1
 
       # ──────────────────────────────────────────
       # 7단계: 보안 검증 - gitleaks 시크릿 스캔
+      # gitleaks CLI 직접 실행 (조직 저장소 라이선스 불필요)
       # ──────────────────────────────────────────
       - name: gitleaks 시크릿 스캔
         id: gitleaks-check
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # 상업용 라이선스 보유 시 주석 해제
-          # gitleaks-action@v2는 pull_request 이벤트에서 자동으로 PR diff 스캔 수행
-          # 시크릿 감지 시 자동으로 exit code 1 반환 및 PR 코멘트 작성
+        if: ${{ !cancelled() }}
+        run: |
+          # gitleaks 최신 버전 설치
+          GITLEAKS_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | grep '"tag_name"' | sed 's/.*"v\(.*\)".*/\1/')
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o gitleaks.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          chmod +x gitleaks
+
+          echo "gitleaks v${GITLEAKS_VERSION} 설치 완료"
+
+          # PR diff 범위만 스캔
+          ./gitleaks detect \
+            --source . \
+            --log-opts="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" \
+            --verbose \
+            --exit-code 1 \
+            && echo "시크릿 스캔 통과 - 감지된 시크릿 없음" \
+            || { echo "::error::시크릿이 감지되었습니다! PR에서 민감 정보를 제거해 주세요."; exit 1; }
 
       # ──────────────────────────────────────────
       # 8단계: 금지 파일 차단
       # .env, credentials.json 등 민감 파일 업로드 금지
+      # gitleaks와 독립적으로 항상 실행
       # ──────────────────────────────────────────
       - name: 금지 파일 차단
         id: forbidden-files-check
+        if: ${{ !cancelled() }}
         run: |
           CHANGED_FILES="${{ steps.changed-files.outputs.changed_files }}"
 
@@ -523,72 +481,64 @@ jobs:
           echo "금지 파일 검사 통과"
 
       # ──────────────────────────────────────────
-      # 9단계: 검증 결과 PR 코멘트 작성
+      # 9단계: 검증 결과를 artifact로 저장
+      # post-validation.yml에서 이 결과를 읽어 코멘트/라벨 처리
       # ──────────────────────────────────────────
-      - name: 검증 결과 PR 코멘트 작성
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: 검증 결과 저장
+        if: ${{ always() }}
         run: |
-          # 각 단계 결과 수집
-          PR_BODY_RESULT="${{ steps.pr-body-check.outcome }}"
-          FORK_RESULT="${{ steps.fork-check.outcome }}"
-          OWNERSHIP_RESULT="${{ steps.ownership-check.outcome }}"
-          STRUCTURE_RESULT="${{ steps.skill-structure-check.outcome }}"
-          COMMON_RESULT="${{ steps.common-area-check.outcome }}"
-          GITLEAKS_RESULT="${{ steps.gitleaks-check.outcome }}"
-          FORBIDDEN_RESULT="${{ steps.forbidden-files-check.outcome }}"
+          mkdir -p /tmp/validation-results
 
-          # 결과 이모지 변환 함수 (bash에서는 함수 사용)
-          get_icon() {
-            case "$1" in
-              success)  echo "✅" ;;
-              failure)  echo "❌" ;;
-              skipped)  echo "⏭️" ;;
-              *)        echo "⏳" ;;
-            esac
-          }
+          # 라벨 판별용 데이터
+          SKILL_DIRS="${{ steps.changed-files.outputs.skill_dirs }}"
+          COMMON_CHANGED="${{ steps.changed-files.outputs.common_changed }}"
+          LABELS=""
 
-          PR_BODY_ICON=$(get_icon "$PR_BODY_RESULT")
-          FORK_ICON=$(get_icon "$FORK_RESULT")
-          OWNERSHIP_ICON=$(get_icon "$OWNERSHIP_RESULT")
-          STRUCTURE_ICON=$(get_icon "$STRUCTURE_RESULT")
-          COMMON_ICON=$(get_icon "$COMMON_RESULT")
-          GITLEAKS_ICON=$(get_icon "$GITLEAKS_RESULT")
-          FORBIDDEN_ICON=$(get_icon "$FORBIDDEN_RESULT")
+          if [ -n "$SKILL_DIRS" ]; then
+            HAS_NEW=0
+            HAS_MODIFIED=0
 
-          # 전체 결과 판정
-          # COMMON_RESULT만 != "failure" (skipped 허용): 공통 영역 미변경 시 skipped이므로 통과 처리
-          # 나머지는 반드시 success여야 함 (skipped 불허)
-          if [ "$PR_BODY_RESULT" = "success" ] && \
-             [ "$FORK_RESULT" = "success" ] && \
-             [ "$OWNERSHIP_RESULT" = "success" ] && \
-             [ "$STRUCTURE_RESULT" = "success" ] && \
-             [ "$COMMON_RESULT" != "failure" ] && \
-             [ "$GITLEAKS_RESULT" = "success" ] && \
-             [ "$FORBIDDEN_RESULT" = "success" ]; then
-            OVERALL="✅ **모든 검증 통과** - 머지 가능합니다!"
-          else
-            OVERALL="❌ **검증 실패** - 위의 오류를 수정한 후 PR을 업데이트해 주세요."
+            for SKILL_DIR in $SKILL_DIRS; do
+              if git ls-tree -d origin/main -- "$SKILL_DIR" > /dev/null 2>&1 && \
+                 [ -n "$(git ls-tree -d origin/main -- "$SKILL_DIR")" ]; then
+                HAS_MODIFIED=1
+              else
+                HAS_NEW=1
+              fi
+            done
+
+            [ "$HAS_NEW" = "1" ] && LABELS="$LABELS,🆕 새 Skill"
+            [ "$HAS_MODIFIED" = "1" ] && LABELS="$LABELS,✏️ Skill 수정"
           fi
 
-          # PR 코멘트 작성
-          gh pr comment ${{ github.event.number }} --body "## 🔍 Skill 자동 검증 결과
+          if [ "$COMMON_CHANGED" = "true" ]; then
+            LABELS="$LABELS,⚙️ 공통 영역"
+          fi
 
-          | 검증 항목 | 결과 |
-          |-----------|------|
-          | $PR_BODY_ICON 변경 유형 체크 | \`$PR_BODY_RESULT\` |
-          | $FORK_ICON Fork PR 확인 | \`$FORK_RESULT\` |
-          | $OWNERSHIP_ICON 디렉토리 소유권 | \`$OWNERSHIP_RESULT\` |
-          | $STRUCTURE_ICON SKILL.md 구조 | \`$STRUCTURE_RESULT\` |
-          | $COMMON_ICON 공통 영역 보호 | \`$COMMON_RESULT\` |
-          | $GITLEAKS_ICON 시크릿 스캔 (gitleaks) | \`$GITLEAKS_RESULT\` |
-          | $FORBIDDEN_ICON 금지 파일 검사 | \`$FORBIDDEN_RESULT\` |
+          LABELS=$(echo "$LABELS" | sed 's/^,//')
 
-          ---
+          cat > /tmp/validation-results/results.json << RESULTS_EOF
+          {
+            "pr_number": ${{ github.event.number }},
+            "pr_body_check": "${{ steps.pr-body-check.outcome }}",
+            "fork_check": "${{ steps.fork-check.outcome }}",
+            "ownership_check": "${{ steps.ownership-check.outcome }}",
+            "structure_check": "${{ steps.skill-structure-check.outcome }}",
+            "common_area_check": "${{ steps.common-area-check.outcome }}",
+            "gitleaks_check": "${{ steps.gitleaks-check.outcome }}",
+            "forbidden_files_check": "${{ steps.forbidden-files-check.outcome }}",
+            "common_changed": "$COMMON_CHANGED",
+            "labels": "$LABELS"
+          }
+          RESULTS_EOF
 
-          $OVERALL
+          echo "검증 결과 저장 완료:"
+          cat /tmp/validation-results/results.json
 
-          > 검증 상세 로그는 [Actions 탭](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})에서 확인하세요.
-          > 문의사항은 @L3G4CY-TEAM/admins 에게 태그해 주세요." \
-          2>/dev/null || echo "::warning::PR 코멘트 작성 실패 (권한 확인 필요)"
+      - name: 결과 artifact 업로드
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-results
+          path: /tmp/validation-results/results.json
+          retention-days: 1
