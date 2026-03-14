@@ -1,0 +1,93 @@
+# =============================================
+# L3G4CY BugBounty Skills - .gitignore
+# =============================================
+
+# ----------------
+# Python
+# ----------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ----------------
+# Node.js
+# ----------------
+node_modules/
+
+# ----------------
+# 운영 체제
+# ----------------
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+
+# ----------------
+# 보안 (민감 정보)
+# ----------------
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+credentials*
+secrets*
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+*.ppk
+aws_credentials
+.netrc
+htpasswd
+
+# ----------------
+# IDE / 에디터
+# ----------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ----------------
+# 바이너리
+# ----------------
+*.exe
+*.dll
+*.so
+*.dylib
+*.bin
+*.out
+
+# ----------------
+# 임시 / 로그 / 백업
+# ----------------
+*.log
+*.tmp
+*.bak
+
+# ----------------
+# 개발 도구 (OMC)
+# ----------------
+.omc/
+
+# ----------------
+# AI
+# ----------------
+.claude/
+CLAUDE.md
+.codex/
+AGENTS.md
+.gemini/
+.antigravity/
+GEMINI.md

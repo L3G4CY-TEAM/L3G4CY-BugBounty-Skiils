@@ -1,0 +1,45 @@
+# =============================================
+# L3G4CY BugBounty Skills - .gitattributes
+# 크로스 플랫폼 줄바꿈(CRLF/LF) 정규화
+# =============================================
+
+# 기본: 모든 텍스트 파일을 LF로 정규화
+* text=auto eol=lf
+
+# ----------------
+# 문서
+# ----------------
+*.md text eol=lf
+*.txt text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+
+# ----------------
+# 스크립트
+# ----------------
+*.sh text eol=lf
+*.py text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.rb text eol=lf
+
+# ----------------
+# Windows 전용 (CRLF 유지)
+# ----------------
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# ----------------
+# 바이너리 (변환 금지)
+# ----------------
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+*.7z binary
