@@ -1,0 +1,16 @@
+name: "\u2753 질문"
+description: "사용법, 기여 방법 등에 대해 질문합니다."
+labels: ["\u2753 질문"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        질문 전에 [CONTRIBUTING.md](https://github.com/L3G4CY-TEAM/L3G4CY-BugBounty-Skiils/blob/main/CONTRIBUTING.md)를 먼저 확인해 주세요.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: "질문 내용"
+      description: "궁금한 점을 자유롭게 작성해 주세요."
+    validations:
+      required: true

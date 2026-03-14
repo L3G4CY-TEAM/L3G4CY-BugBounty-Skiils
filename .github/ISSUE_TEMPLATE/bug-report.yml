@@ -1,0 +1,41 @@
+name: "\U0001F41B 버그 리포트"
+description: "Skill 오류, 워크플로우 문제 등을 제보합니다."
+labels: ["\U0001F41B 버그"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        버그 리포트를 작성해 주셔서 감사합니다.
+
+  - type: input
+    id: skill
+    attributes:
+      label: "관련 Skill (해당 시)"
+      description: "문제가 발생한 Skill 경로"
+      placeholder: "skills/username/skill-name"
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "버그 설명"
+      description: "어떤 문제가 발생했는지 설명해 주세요."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "기대 동작"
+      description: "정상적으로 동작했다면 어떻게 되어야 하나요?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: "재현 방법"
+      description: "버그를 재현하는 단계를 알려 주세요."
+    validations:
+      required: false

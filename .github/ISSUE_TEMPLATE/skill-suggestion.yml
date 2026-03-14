@@ -1,0 +1,46 @@
+name: "\U0001F4A1 Skill 제안"
+description: "새로운 Skill 아이디어를 공유합니다."
+labels: ["\u2728 개선"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Skill 아이디어를 공유해 주셔서 감사합니다.
+
+  - type: input
+    id: name
+    attributes:
+      label: "Skill 이름"
+      description: "제안하는 Skill의 이름 (kebab-case)"
+      placeholder: "xss-hunter"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: "카테고리"
+      options:
+        - recon
+        - exploit
+        - report
+        - analysis
+        - misc
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Skill 설명"
+      description: "이 Skill이 어떤 상황에서 유용한지 설명해 주세요."
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: "참고 자료 (선택)"
+      description: "관련 블로그, 도구, 기법 등의 링크"
+    validations:
+      required: false

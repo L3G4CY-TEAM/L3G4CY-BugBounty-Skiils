@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "\U0001F4D6 기여 가이드"
+    url: https://github.com/L3G4CY-TEAM/L3G4CY-BugBounty-Skiils/blob/main/CONTRIBUTING.md
+    about: "Skill 추가/수정 방법은 기여 가이드를 참고하세요."
