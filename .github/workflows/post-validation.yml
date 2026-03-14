@@ -12,6 +12,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  members: read
 
 jobs:
   post-validation:
@@ -101,10 +102,14 @@ jobs:
           echo "PR 작성자: $PR_AUTHOR"
 
           # admins 팀 멤버 중 PR 작성자를 제외한 리뷰어 목록 생성
-          REVIEWERS=$(gh api \
+          MEMBERS_RAW=$(gh api \
             "orgs/${{ github.repository_owner }}/teams/admins/members" \
-            --jq '.[].login' \
-            | grep -v "^${PR_AUTHOR}$" || true)
+            --jq '.[].login' 2>/dev/null) || {
+            echo "::warning::admins 팀 멤버 조회 실패. 리뷰어 자동 지정을 건너뜁니다."
+            exit 0
+          }
+
+          REVIEWERS=$(echo "$MEMBERS_RAW" | grep -v "^${PR_AUTHOR}$" || true)
 
           if [ -z "$REVIEWERS" ]; then
             echo "::notice::PR 작성자($PR_AUTHOR)가 admins 팀의 유일한 멤버입니다. 리뷰어 자동 지정을 건너뜁니다."
