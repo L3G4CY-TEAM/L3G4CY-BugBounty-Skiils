@@ -91,8 +91,14 @@ jobs:
         if: ${{ steps.parse.outputs.common_changed == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
+          ADMIN_MEMBERS: ${{ vars.ADMIN_MEMBERS }}
         run: |
           PR_NUMBER="${{ steps.parse.outputs.pr_number }}"
+
+          if [ -z "$ADMIN_MEMBERS" ]; then
+            echo "::warning::ADMIN_MEMBERS 변수가 설정되지 않았습니다. 리뷰어 자동 지정을 건너뜁니다."
+            exit 0
+          fi
 
           # PR 작성자 조회
           PR_AUTHOR=$(gh pr view "$PR_NUMBER" \
@@ -100,36 +106,28 @@ jobs:
             --json author --jq '.author.login')
           echo "PR 작성자: $PR_AUTHOR"
 
-          # admins 팀 멤버 중 PR 작성자를 제외한 리뷰어 목록 생성
-          REVIEWERS=$(gh api \
-            "orgs/${{ github.repository_owner }}/teams/admins/members" \
-            --jq '.[].login' \
-            | grep -v "^${PR_AUTHOR}$" || true)
+          # 관리자 목록에서 PR 작성자를 제외하고 리뷰어 지정
+          ASSIGNED=0
+          IFS=',' read -ra ADMINS <<< "$ADMIN_MEMBERS"
+          for ADMIN in "${ADMINS[@]}"; do
+            ADMIN=$(echo "$ADMIN" | xargs)  # 공백 제거
+            if [ -z "$ADMIN" ]; then continue; fi
+            if [ "$ADMIN" = "$PR_AUTHOR" ]; then
+              echo "PR 작성자($ADMIN) 제외"
+              continue
+            fi
+            gh pr edit "$PR_NUMBER" \
+              --repo "${{ github.repository }}" \
+              --add-reviewer "$ADMIN" \
+              && { echo "리뷰어 지정 완료: @$ADMIN"; ASSIGNED=$((ASSIGNED + 1)); } \
+              || echo "::warning::리뷰어 지정 실패: @$ADMIN"
+          done
 
-          if [ -z "$REVIEWERS" ]; then
-            echo "::notice::PR 작성자($PR_AUTHOR)가 admins 팀의 유일한 멤버입니다. 리뷰어 자동 지정을 건너뜁니다."
-            exit 0
+          if [ "$ASSIGNED" -eq 0 ]; then
+            echo "::notice::지정 가능한 리뷰어가 없습니다 (PR 작성자 제외 후 남은 관리자 없음)."
+          else
+            echo "총 ${ASSIGNED}명의 리뷰어가 지정되었습니다."
           fi
-
-          # 팀 리뷰어 지정 시도
-          echo "관리자 팀을 리뷰어로 지정 중..."
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/${{ github.repository }}/pulls/${PR_NUMBER}/requested_reviewers" \
-            -f "team_reviewers[]=admins" \
-            && echo "리뷰어 지정 완료: @L3G4CY-TEAM/admins" \
-            || {
-              # 팀 지정 실패 시 개별 멤버로 폴백
-              echo "::warning::팀 리뷰어 지정 실패. 개별 멤버로 지정 시도 중..."
-              for REVIEWER in $REVIEWERS; do
-                gh pr edit "$PR_NUMBER" \
-                  --repo "${{ github.repository }}" \
-                  --add-reviewer "$REVIEWER" \
-                  && echo "리뷰어 지정 완료: @$REVIEWER" \
-                  || echo "::warning::리뷰어 지정 실패: @$REVIEWER"
-              done
-            }
 
       # ──────────────────────────────────────────
       # 5단계: 검증 결과 PR 코멘트 작성
