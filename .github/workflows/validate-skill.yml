@@ -384,6 +384,7 @@ jobs:
       # ──────────────────────────────────────────
       - name: 공통 영역 보호 확인
         id: common-area-check
+        if: ${{ !cancelled() }}
         run: |
           COMMON_CHANGED="${{ steps.changed-files.outputs.common_changed }}"
 

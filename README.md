@@ -23,8 +23,8 @@
 - [퀵 스타트](#-퀵-스타트)
 - [제약 조건](#-제약-조건)
 - [기여 흐름](#-기여-흐름)
-- [보안 정책](#-보안-정책)
-- [면책 조항](#-면책-조항)
+- [보안 정책](#보안-정책)
+- [면책 조항](#면책-조항)
 - [라이선스](#-라이선스)
 
 ---
@@ -147,7 +147,7 @@ graph LR
 
 ---
 
-<details>
+<details id="보안-정책">
 <summary><strong>🔒 보안 정책</strong></summary>
 
 <br>
@@ -158,7 +158,7 @@ graph LR
 
 </details>
 
-<details>
+<details id="면책-조항">
 <summary><strong>⚠️ 면책 조항</strong></summary>
 
 <br>
