@@ -384,8 +384,6 @@ jobs:
       # ──────────────────────────────────────────
       - name: 공통 영역 보호 확인
         id: common-area-check
-        env:
-          ADMIN_MEMBERS: ${{ vars.ADMIN_MEMBERS }}
         run: |
           COMMON_CHANGED="${{ steps.changed-files.outputs.common_changed }}"
 
@@ -396,26 +394,13 @@ jobs:
 
           echo "::warning::공통 영역 파일이 수정되었습니다."
 
-          # PR 작성자가 유일한 관리자인 경우 셀프 머지 허용
           PR_AUTHOR="${{ github.event.pull_request.user.login }}"
-          OTHER_ADMINS=""
-          IFS=',' read -ra ADMINS <<< "$ADMIN_MEMBERS"
-          for ADMIN in "${ADMINS[@]}"; do
-            ADMIN=$(echo "$ADMIN" | xargs)
-            if [ -n "$ADMIN" ] && [ "$ADMIN" != "$PR_AUTHOR" ]; then
-              OTHER_ADMINS="$ADMIN"
-              break
-            fi
-          done
-
-          if [ -z "$OTHER_ADMINS" ]; then
-            echo "::notice::PR 작성자($PR_AUTHOR)가 유일한 관리자입니다. 공통 영역 셀프 머지를 허용합니다."
+          if [ "$PR_AUTHOR" = "LRTK-CODER" ]; then
+            echo "::notice::관리자($PR_AUTHOR) 셀프 머지를 허용합니다."
             exit 0
           fi
 
-          # 다른 관리자가 있으면 리뷰 필요
-          echo "::warning::관리자 팀(@L3G4CY-TEAM/admins)의 리뷰 승인이 필요합니다."
-          echo "::error::공통 영역 보호: skills/ 밖의 파일은 관리자 팀의 리뷰가 필요합니다."
+          echo "::error::공통 영역 보호: skills/ 밖의 파일은 관리자의 리뷰가 필요합니다."
           echo "::error::@L3G4CY-TEAM/admins 의 승인 후 머지가 가능합니다."
           exit 1
 
